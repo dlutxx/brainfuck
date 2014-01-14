@@ -68,11 +68,15 @@ static BFInstruction* _execute(BFCode* code, BFInstruction* exe, BFState* st)
 {
     BFInstruction* i;
     while (NULL != exe) {
-        if (BF_TOKEN_NEXT == exe->type && ++st->slot_index > st->slot_size) {
-            st->error = ERR_SLOTS_OVERFLOW;
-            break;
+        // fprintf(stderr, "%c", exe->type);
+        if (BF_TOKEN_NEXT == exe->type) {
+            ++st->slot_index;
+            if (st->slot_index >= st->slot_size) {
+                st->error = ERR_SLOTS_OVERFLOW;
+                break;
+            }
         } else if (BF_TOKEN_PREVIOUS == exe->type) {
-            if (--st->slot_index == 0) {
+            if (st->slot_index == 0) {
                 st->error = ERR_SLOTS_UNDERFLOW;
                 break;
             }
@@ -83,7 +87,7 @@ static BFInstruction* _execute(BFCode* code, BFInstruction* exe, BFState* st)
             --st->slots[st->slot_index];
         } else if (BF_TOKEN_INPUT == exe->type) {
             st->slots[st->slot_index] = (char)getchar();
-        } else if (BF_TOKEN_INPUT == exe->type) {
+        } else if (BF_TOKEN_OUTPUT == exe->type) {
             putchar(st->slots[st->slot_index]);
         } else if (BF_TOKEN_LOOP_START == exe->type) {
             while (st->slots[st->slot_index])
@@ -96,6 +100,7 @@ static BFInstruction* _execute(BFCode* code, BFInstruction* exe, BFState* st)
                 st->error = ERR_SYNTAX_UNEXPECTED_TOKEN;
                 break;
             }
+            exe = i;
         } else if (BF_TOKEN_LOOP_END == exe->type) {
             return exe;
         } else {
@@ -118,5 +123,18 @@ int bf_execute(BFCode* code, BFState* st)
     return 0;
 }
 
-int bf_dump_code(BFCode* code);
-int bf_free_code(BFCode* code);
+int bf_dump_code(BFCode* code)
+{
+    BFInstruction * i;
+    i = code->head;
+    while (NULL != i) {
+        putchar(i->type);
+        i = i->next;
+    }
+    return 0;
+}
+
+int bf_free_code(BFCode* code)
+{
+    return 0;
+}

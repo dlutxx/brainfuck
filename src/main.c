@@ -6,10 +6,14 @@
 int main(int argc, char* argv[])
 {
     FILE* fp = fopen(argv[1], "r");
+    int c;
     BFState* st = bf_create_state(DEFAULT_BF_SLOTS);
-    BFCode* code= bf_compile(fp);
+    BFCode* code= bf_compile_file(fp);
     assert(st != NULL);
     assert(NULL != code);
 
-    return bf_execute(code, st);
+    // bf_dump_code(code);
+    c = bf_execute(code, st);
+    printf("\n");
+    return c;
 }

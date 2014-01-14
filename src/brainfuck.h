@@ -11,7 +11,7 @@
 #define BF_TOKEN_PLUS '+'
 #define BF_TOKEN_MINUS '-'
 #define BF_TOKEN_OUTPUT '.'
-#define BF_TOKEN_INPUT '.'
+#define BF_TOKEN_INPUT ','
 #define BF_TOKEN_LOOP_START '['
 #define BF_TOKEN_LOOP_END ']'
 
