@@ -67,17 +67,22 @@ BFCode* bf_compile_str(char* str, size_t len)
 static BFInstruction* _execute(BFCode* code, BFInstruction* exe, BFState* st)
 {
     BFInstruction* i;
+    int brkt=0;
     while (NULL != exe) {
         // fprintf(stderr, "%c", exe->type);
         if (BF_TOKEN_NEXT == exe->type) {
             ++st->slot_index;
             if (st->slot_index >= st->slot_size) {
                 st->error = ERR_SLOTS_OVERFLOW;
+                    fprintf(stderr, "%d %lu %zu\n", __LINE__, st->slot_index, st->slot_size);
+                    exit(1);
                 break;
             }
         } else if (BF_TOKEN_PREVIOUS == exe->type) {
             if (st->slot_index == 0) {
                 st->error = ERR_SLOTS_UNDERFLOW;
+                    fprintf(stderr, "%d\n", __LINE__);
+                    exit(1);
                 break;
             }
             --st->slot_index;
@@ -90,15 +95,38 @@ static BFInstruction* _execute(BFCode* code, BFInstruction* exe, BFState* st)
         } else if (BF_TOKEN_OUTPUT == exe->type) {
             putchar(st->slots[st->slot_index]);
         } else if (BF_TOKEN_LOOP_START == exe->type) {
-            while (st->slots[st->slot_index])
-                i = _execute(code, exe->next, st); // Expecting i = LOOP_END
-            if (NULL == i) {
-                st->error = ERR_SYNTAX_UNEXPECTED_END;
-                break;
-            }
-            if (BF_TOKEN_LOOP_END != i->type) {
-                st->error = ERR_SYNTAX_UNEXPECTED_TOKEN;
-                break;
+            if (st->slots[st->slot_index]) {
+                while (st->slots[st->slot_index]) {
+                    i = _execute(code, exe->next, st); 
+                }
+                if (NULL == i) {
+                    st->error = ERR_SYNTAX_UNEXPECTED_END;
+                    fprintf(stderr, "%d\n", __LINE__);
+                    exit(1);
+                    break;
+                } else if (BF_TOKEN_LOOP_END != i->type) {
+                    st->error = ERR_SYNTAX_UNEXPECTED_TOKEN;
+                    break;
+                }
+            } else { // consume until LOOP_END
+                brkt = 1;
+                while (NULL != (exe=exe->next)) {
+                    if (BF_TOKEN_LOOP_START == exe->type)
+                        ++brkt;
+                    else if (BF_TOKEN_LOOP_END == exe->type) {
+                        --brkt;
+                        if (0 == brkt) break;
+                    }
+                }
+                if (brkt) { // unblanced brackets!
+                    st->error = ERR_SYNTAX_UNEXPECTED_TOKEN;
+                    break;
+                } else if (NULL == exe) {
+                    st->error = ERR_SYNTAX_UNEXPECTED_END;
+                    fprintf(stderr, "%d\n", __LINE__);
+                    exit(1);
+                    break;
+                }
             }
             exe = i;
         } else if (BF_TOKEN_LOOP_END == exe->type) {
