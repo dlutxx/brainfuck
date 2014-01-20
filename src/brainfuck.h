@@ -42,7 +42,7 @@ typedef struct BFState {
     unsigned long slot_size;
     unsigned long slot_index;
     int error;
-    char slots[];
+    char slots[]; // Yes, dynamic array is GREAT!
 } BFState;
 
 BFState* bf_create_state(unsigned long size);

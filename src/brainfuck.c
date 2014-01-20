@@ -16,6 +16,19 @@ int bf_free_state(BFState* stat)
     return 0;
 }
 
+static BFInstruction* bf_create_instruction(char type)
+{
+    BFInstruction *i = malloc(sizeof(BFInstruction));
+    if (NULL == i) {
+        fprintf(stderr, "Out of Memory\n");
+        exit(1);
+    }
+    i->type = type;
+    i->repeat = 1;
+    i->next = i->child = NULL;
+    return i;
+}
+
 static BFInstruction* bf_compile(FILE* fp)
 {
     BFInstruction *root=NULL, *tail=NULL, *i;
@@ -23,31 +36,31 @@ static BFInstruction* bf_compile(FILE* fp)
     while ((chr=fgetc(fp))!=EOF) {
         if (BF_TOKEN_PLUS == chr || BF_TOKEN_MINUS == chr ||
             BF_TOKEN_NEXT == chr || BF_TOKEN_PREVIOUS == chr ||
-            BF_TOKEN_INPUT == chr || BF_TOKEN_OUTPUT == chr ||
-            BF_TOKEN_LOOP_START == chr) {
-            // create node
-            i = malloc(sizeof(BFInstruction));
-            if (NULL==i) {
-                fprintf(stderr, "Out of memory\n");
-                exit(1);
+            BF_TOKEN_INPUT == chr || BF_TOKEN_OUTPUT == chr) {
+            if (tail !=NULL && tail->type == chr) {
+                i = tail;
+                ++ i->repeat;
+            } else {
+                i = bf_create_instruction(chr);
+                if (tail == NULL)
+                    root = tail = i;
+                else {
+                    tail->next = i;
+                    tail = i;
+                }
             }
-            i->type = chr;
-            i->repeat = 1;
-            i->next = i->child = NULL;
-            // append node
+            while (i->type == (chr=fgetc(fp)))
+                ++ i->repeat;
+            ungetc(chr, fp);
+        } else if (BF_TOKEN_LOOP_START == chr) {
+            i = bf_create_instruction(chr);
             if (tail == NULL)
                 root = tail = i;
             else {
                 tail->next = i;
                 tail = i;
             }
-            if (BF_TOKEN_LOOP_START == chr) {
-                i->child = bf_compile(fp);
-            } else {
-                while (i->type == (chr=fgetc(fp)))
-                    ++ i->repeat;
-                ungetc(chr, fp);
-            }
+            i->child = bf_compile(fp);
         } else if (BF_TOKEN_LOOP_END == chr) {
             break;
         } else {
