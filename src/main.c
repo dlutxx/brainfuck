@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
     assert(st != NULL);
     assert(NULL != code);
 
-    // bf_dump_code(code);
+    // bf_dump_code(code->head);
     c = bf_execute(code, st);
     printf("\n");
     return c;

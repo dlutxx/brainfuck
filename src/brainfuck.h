@@ -26,6 +26,8 @@
 
 typedef struct BFInstruction {
     struct BFInstruction *next;
+    struct BFInstruction *child; // if this is a while loop, this points to sub-instructions;
+    int repeat; // how many consecutive identical instructions
     char type;
 } BFInstruction;
 
@@ -48,7 +50,7 @@ int bf_free_state(BFState* stat);
 BFCode* bf_compile_file(FILE* fp);
 BFCode* bf_compile_str(char* str, size_t len);
 int bf_execute(BFCode* code, BFState* st);
-int bf_dump_code(BFCode* code);
+int bf_dump_code(BFInstruction* code);
 int bf_free_code(BFCode* code);
 
 #endif

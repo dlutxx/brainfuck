@@ -16,45 +16,56 @@ int bf_free_state(BFState* stat)
     return 0;
 }
 
+static BFInstruction* bf_compile(FILE* fp)
+{
+    BFInstruction *root=NULL, *tail=NULL, *i;
+    int chr;
+    while ((chr=fgetc(fp))!=EOF) {
+        if (BF_TOKEN_PLUS == chr || BF_TOKEN_MINUS == chr ||
+            BF_TOKEN_NEXT == chr || BF_TOKEN_PREVIOUS == chr ||
+            BF_TOKEN_INPUT == chr || BF_TOKEN_OUTPUT == chr ||
+            BF_TOKEN_LOOP_START == chr) {
+            // create node
+            i = malloc(sizeof(BFInstruction));
+            if (NULL==i) {
+                fprintf(stderr, "Out of memory\n");
+                exit(1);
+            }
+            i->type = chr;
+            i->repeat = 1;
+            i->next = i->child = NULL;
+            // append node
+            if (tail == NULL)
+                root = tail = i;
+            else {
+                tail->next = i;
+                tail = i;
+            }
+            if (BF_TOKEN_LOOP_START == chr) {
+                i->child = bf_compile(fp);
+            } else {
+                while (i->type == (chr=fgetc(fp)))
+                    ++ i->repeat;
+                ungetc(chr, fp);
+            }
+        } else if (BF_TOKEN_LOOP_END == chr) {
+            break;
+        } else {
+            // ignore unknown chars
+        }
+    }
+    return root;
+}
 
 BFCode* bf_compile_file(FILE* fp)
 {
-    BFCode * code = calloc(sizeof(BFCode), 1);
-    int chr, brackets=0;
-    if (NULL!=code) {
-        while ((chr=fgetc(fp))!=EOF) {
-            ++code->errpos;
-            if (BF_TOKEN_PLUS != chr && BF_TOKEN_MINUS != chr &&
-                BF_TOKEN_NEXT != chr && BF_TOKEN_PREVIOUS != chr &&
-                BF_TOKEN_INPUT != chr && BF_TOKEN_OUTPUT != chr &&
-                BF_TOKEN_LOOP_START != chr && BF_TOKEN_LOOP_END != chr)
-                continue; // skip illegal chars
-
-            if (BF_TOKEN_LOOP_START == chr)
-                ++brackets;
-            else if (BF_TOKEN_LOOP_END == chr && --brackets<0) {
-                code->error = ERR_UNBALANCED_BRACKET; 
-                return code;
-            }
-            BFInstruction * i = calloc(sizeof(BFInstruction), 1);
-            if (i==NULL) {
-                code->error = ERR_MEMORY;
-                return code;
-            }
-            i->type = chr;
-            if (code->tail == NULL)
-                code->head = code->tail = i;
-            else {
-                code->tail->next = i;
-                code->tail = i;
-            }
-        }
-        if (brackets)
-            code->error = ERR_UNBALANCED_BRACKET;
-        if (ferror(fp))
-            code->error = ERR_READ;
-        fclose(fp);
+    BFCode * code;
+    code = malloc(sizeof(BFCode));
+    if (NULL==code) {
+        fprintf(stderr, "Out of Memory");
+        exit(1);
     }
+    code->head = bf_compile(fp);
     return code;
 }
 
@@ -66,12 +77,11 @@ BFCode* bf_compile_str(char* str, size_t len)
 
 static BFInstruction* _execute(BFCode* code, BFInstruction* exe, BFState* st)
 {
-    BFInstruction* i;
-    int brkt=0;
+    // int brkt=0;
     while (NULL != exe) {
-        // fprintf(stderr, "%c", exe->type);
+        // fprintf(stdout, "%c, %d\n", exe->type, exe->repeat);
         if (BF_TOKEN_NEXT == exe->type) {
-            ++st->slot_index;
+            st->slot_index += exe->repeat;
             if (st->slot_index >= st->slot_size) {
                 st->error = ERR_SLOTS_OVERFLOW;
                     fprintf(stderr, "%d %lu %zu\n", __LINE__, st->slot_index, st->slot_size);
@@ -85,55 +95,25 @@ static BFInstruction* _execute(BFCode* code, BFInstruction* exe, BFState* st)
                     exit(1);
                 break;
             }
-            --st->slot_index;
+            st->slot_index -= exe->repeat;
         } else if (BF_TOKEN_PLUS == exe->type) {
-            ++st->slots[st->slot_index];
+            st->slots[st->slot_index] += exe->repeat;
         } else if (BF_TOKEN_MINUS == exe->type) {
-            --st->slots[st->slot_index];
+            st->slots[st->slot_index] -= exe->repeat;
         } else if (BF_TOKEN_INPUT == exe->type) {
-            st->slots[st->slot_index] = (char)getchar();
+            int n;
+            for (n=0; n<exe->repeat; ++n)
+                st->slots[st->slot_index] = (char)getchar();
         } else if (BF_TOKEN_OUTPUT == exe->type) {
-            putchar(st->slots[st->slot_index]);
+            int n;
+            for (n=0; n<exe->repeat; ++n)
+                putchar(st->slots[st->slot_index]);
         } else if (BF_TOKEN_LOOP_START == exe->type) {
-            if (st->slots[st->slot_index]) {
-                while (st->slots[st->slot_index]) {
-                    i = _execute(code, exe->next, st); 
-                }
-                if (NULL == i) {
-                    st->error = ERR_SYNTAX_UNEXPECTED_END;
-                    fprintf(stderr, "%d\n", __LINE__);
-                    exit(1);
-                    break;
-                } else if (BF_TOKEN_LOOP_END != i->type) {
-                    st->error = ERR_SYNTAX_UNEXPECTED_TOKEN;
-                    break;
-                }
-            } else { // consume until LOOP_END
-                brkt = 1;
-                while (NULL != (exe=exe->next)) {
-                    if (BF_TOKEN_LOOP_START == exe->type)
-                        ++brkt;
-                    else if (BF_TOKEN_LOOP_END == exe->type) {
-                        --brkt;
-                        if (0 == brkt) break;
-                    }
-                }
-                if (brkt) { // unblanced brackets!
-                    st->error = ERR_SYNTAX_UNEXPECTED_TOKEN;
-                    break;
-                } else if (NULL == exe) {
-                    st->error = ERR_SYNTAX_UNEXPECTED_END;
-                    fprintf(stderr, "%d\n", __LINE__);
-                    exit(1);
-                    break;
-                }
-            }
-            exe = i;
-        } else if (BF_TOKEN_LOOP_END == exe->type) {
-            return exe;
+            while (st->slots[st->slot_index])
+                _execute(code, exe->child, st);
         } else {
-            st->error = ERR_SYNTAX_ILLEGAL_TOKEN;
-            return NULL;
+            fprintf(stderr, "Wtf %c?\n", exe->type);
+            exit(1);
         }
         exe = exe->next;
     }
@@ -151,12 +131,16 @@ int bf_execute(BFCode* code, BFState* st)
     return 0;
 }
 
-int bf_dump_code(BFCode* code)
+int bf_dump_code(BFInstruction* i)
 {
-    BFInstruction * i;
-    i = code->head;
     while (NULL != i) {
-        putchar(i->type);
+        if (BF_TOKEN_LOOP_START == i->type) {
+            printf("%c ", i->type);
+            bf_dump_code(i->child);
+            printf(" %c", BF_TOKEN_LOOP_END);
+        } else {
+            printf("%c%d, ", i->type, i->repeat);
+        }
         i = i->next;
     }
     return 0;

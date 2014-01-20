@@ -6,6 +6,6 @@ brainfuck.o: brainfuck.h brainfuck.c
 	gcc -Wall -c brainfuck.h brainfuck.c
 
 .PHONY: clean
-.SILENT: clean
+#.SILENT: clean
 clean:
-	rm  -rf a.out brainfuck.o *.h.gch
+	@rm  -rf a.out brainfuck.o *.h.gch
