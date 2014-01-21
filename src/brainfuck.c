@@ -4,7 +4,7 @@
 BFState* bf_create_state(unsigned long size)
 {
     BFState * st;
-    st = calloc(size + sizeof(BFState), 1);
+    st = calloc(1, size + sizeof(BFState));
     st->slot_size = size;
     return st;
 }
